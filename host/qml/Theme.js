@@ -347,6 +347,36 @@ function tokens(p) {
   status("Warning", p.yellow)
   status("Danger", p.red, true)
 
+  // --- Teams' own additions on top of Fluent -------------------------------
+  // The client declares these next to the Fluent tokens and paints some of
+  // its largest surfaces with them: the content pane, the app canvas, the
+  // title bar, avatars, and purple-tinted shadows around composite buttons.
+  // Teams dark: Background1 #292929, Background3 #1f1f1f, Background4
+  // #141414, Background5 #0a0a0a; its own tokens sit on that same ladder.
+  t.colorDefaultBackground7 = mix(p.bg2, p.bg3, 0.5)   // #1a1a1a: the content canvas
+  t.backgroundCanvas = p.bg3                            // #1f1f1f
+  t.themeBackgroundColor = p.bg4                        // #141414
+  t.themeColor = fg
+  t.themeLoadingScreenColor = p.bg3                     // #1f1f1f
+  t.themeCarouselTextColor = p.fg3
+  t.themeTitleBarBackgroundColor = p.bg5                // #0a0a0a
+  t.themeTitleBarColor = p.fg2
+  t.themeTitleBarButtonColor = p.fg2
+  t.themeTitleBarButtonHoverBackgroundColor = alpha(fg, 0.1)
+  t.themeTitleBarButtonHoverColor = fg
+  t.colorAvatar = p.brandSoft
+  t.colorAvatarBackground = mix(accent, bg, 0.6)
+  t.colorTeamsBrand1Hover = p.brandHover
+  t.colorTeamsBrand1Pressed = p.brandPressed
+  t.colorTeamsBrand1Selected = accent
+  t.colorTeamsNeutralStrokeSubtleAlpha = alpha(bg, 0.5)
+  for (var i = 1; i <= 4; i++) {
+    t["colorTeamsButtonCompositeFocusShadow" + i] = alpha(accent, 0.08)
+    t["colorTeamsButtonCompositeHoverShadow" + i] = alpha(accent, 0.05)
+    t["colorTeamsCompositeActiveShadow" + i] = alpha(accent, 0.08)
+    t["colorTeamsCompositeHoverShadow" + i] = alpha(accent, 0.03)
+  }
+
   return t
 }
 
@@ -385,6 +415,7 @@ function buildCss(colors, opts) {
   if (opts.fontFamily) {
     t.fontFamilyBase = opts.fontFamily
     t.fontFamilyNumeric = opts.fontFamily
+    t.fontFamilyMonospace = opts.fontFamily
   }
 
   var lines = ["/* omateams: Omarchy theme (" + p.mode + ") */", SELECTOR + " {"]
@@ -398,6 +429,9 @@ function buildCss(colors, opts) {
   lines.push("::-webkit-scrollbar-thumb { background: " + alpha(p.fg, 0.25) + "; border-radius: 4px; }")
   lines.push("::-webkit-scrollbar-thumb:hover { background: " + alpha(p.fg, 0.4) + "; }")
   lines.push("::selection { background: " + alpha(p.accent, 0.35) + "; }")
+  // Teams still draws a few banners with Fluent v0 (Northstar), whose colors
+  // are baked into atomic classes rather than tokens.
+  lines.push(".ui-alert { background-color: " + mix(p.accent, p.bg, 0.82) + " !important; color: " + p.fg + " !important; }")
   return lines.join("\n") + "\n"
 }
 
