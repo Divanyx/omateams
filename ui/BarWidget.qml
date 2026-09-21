@@ -3,7 +3,7 @@ import Quickshell
 import qs.Commons
 import qs.Ui
 
-// One icon, one number, one click. The service owns the state; the widget is
+// One glyph, one number, one click. The service owns the state; the widget is
 // what hands the plugin settings over and what the click lands on.
 BarWidget {
   id: root
@@ -41,21 +41,26 @@ BarWidget {
     BarIconButton {
       id: button
       bar: root.bar
+      // nf-md-microsoft_teams from the Nerd Font the bar already uses, so the
+      // icon sits on the same optical grid as every other widget.
+      text: "󰊻"
+      dimmed: !root.running
       tooltipText: root.teams ? root.teams.tooltip : "Microsoft Teams"
 
-      readonly property color glyphColor: root.running ? root.foreground : Qt.darker(root.foreground, 1.55)
-
-      iconComponent: Component {
-        Item {
-          TeamsIcon {
-            anchors.centerIn: parent
-            iconSize: Style.space(12)
-            color: button.glyphColor
-            badgeColor: Color.accent
-            dot: root.unread > 0 || root.activity
-            crossed: !root.running
-          }
-        }
+      // Unread marker at the glyph's top-right corner, ringed in the bar color
+      // so it stays legible over the glyph's stroke.
+      Rectangle {
+        visible: root.unread > 0 || root.activity
+        width: Style.space(5)
+        height: width
+        radius: width / 2
+        color: Color.accent
+        border.color: Color.bar.background
+        border.width: 1
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.horizontalCenterOffset: Style.bar.iconCanvas * 0.42
+        anchors.verticalCenterOffset: -Style.bar.iconCanvas * 0.42
       }
 
       onPressed: function(buttonCode) {

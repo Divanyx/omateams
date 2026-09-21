@@ -67,11 +67,15 @@ install -Dm755 "$build/omateams" "$bindir/omateams"
 mkdir -p "$HOME/.local/bin"
 ln -sfn "$bindir/omateams" "$HOME/.local/bin/omateams"
 
+# The icon is drawn in placeholder colors; recolor it from the active theme so
+# the launcher tile matches the desktop. Icon caches mean a later theme switch
+# shows the new colors after the next install.sh run (or `omateams icon`).
 icon_dir="$data_home/icons/hicolor"
-install -Dm644 "$here/assets/omateams.svg" "$icon_dir/scalable/apps/omateams.svg"
+"$here/scripts/theme-icon.sh" "$here/assets/omateams.svg" "$build/omateams.svg"
+install -Dm644 "$build/omateams.svg" "$icon_dir/scalable/apps/omateams.svg"
 if command -v rsvg-convert >/dev/null; then
   mkdir -p "$icon_dir/256x256/apps"
-  rsvg-convert -w 256 -h 256 "$here/assets/omateams.svg" -o "$icon_dir/256x256/apps/omateams.png"
+  rsvg-convert -w 256 -h 256 "$build/omateams.svg" -o "$icon_dir/256x256/apps/omateams.png"
 fi
 gtk-update-icon-cache -q "$icon_dir" 2>/dev/null || true
 
