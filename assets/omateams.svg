@@ -10,8 +10,8 @@
   <path fill="#9ece6a" d="M24 64h112v8h8v112h-8v8H24v-8h-8V72h8z"/>
   <path fill="#10131a" d="M32 88h96v24H96v64H64v-64H32z"/>
 
-  <!-- person behind: smaller, dimmer, set higher and to the right -->
-  <path fill="#6f7a8a" d="M224 64h8v8h8v8h-8v8h-8v-8h-8v-8h8z"/>
+  <!-- person behind: dimmer, set higher and to the right -->
+  <path fill="#6f7a8a" d="M224 56h16v8h8v16h-8v8h-16v-8h-8V64h8z"/>
   <path fill="#6f7a8a" d="M224 96h16v8h8v88h-32v-88h8z"/>
 
   <!-- person in front -->
