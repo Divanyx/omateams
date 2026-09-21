@@ -68,8 +68,10 @@ host matches. Remove with `~/.config/omarchy/plugins/omateams/uninstall.sh`
 | right  | show and focus it              |
 | middle | re-read the status file        |
 
-The icon dims with a bar across it while Teams is not running; a dot marks
-unread messages or activity and the count sits next to the icon.
+The icon is the Teams glyph from the Nerd Font the bar already uses; it dims
+while Teams is not running, an accent dot marks unread messages or activity
+and the count sits next to it. The launcher icon is a pixel-grid take on the
+Teams mark, recolored from the active theme at install time.
 
 Settings live on the widget's entry in `~/.config/omarchy/shell.json`
 (Setup › Plugins in the shell, or `omarchy bar set`):

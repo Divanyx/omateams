@@ -1,8 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
-  <rect x="16" y="16" width="224" height="224" rx="48" fill="#1b1e2b"/>
-  <rect x="52" y="64" width="112" height="82" rx="26" fill="none" stroke="#dff7ff" stroke-width="14"/>
-  <path d="M68 138 L60 170 L96 146 Z" fill="#dff7ff"/>
-  <rect x="112" y="112" width="100" height="74" rx="24" fill="#dff7ff"/>
-  <path d="M178 182 L206 206 L190 172 Z" fill="#dff7ff"/>
-  <circle cx="196" cy="70" r="26" fill="#82fb9c"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" shape-rendering="crispEdges">
+  <!-- Omateams icon. Everything sits on an 8px grid with single-step corners,
+       the pixel language of Omarchy's own mark: a "T" tile with two people
+       beside it, the way Teams composes its logo. install.sh recolors it from
+       the active theme: #10131a background, #9ece6a accent, #dbe3ea
+       foreground, #6f7a8a dark_foreground. -->
+  <path fill="#10131a" d="M16 0h224v8h8v8h8v224h-8v8h-8v8H16v-8H8v-8H0V16h8V8h8z"/>
+
+  <!-- T tile -->
+  <path fill="#9ece6a" d="M24 64h112v8h8v112h-8v8H24v-8h-8V72h8z"/>
+  <path fill="#10131a" d="M32 88h96v24H96v64H64v-64H32z"/>
+
+  <!-- person behind: smaller, dimmer, set higher and to the right -->
+  <path fill="#6f7a8a" d="M224 64h8v8h8v8h-8v8h-8v-8h-8v-8h8z"/>
+  <path fill="#6f7a8a" d="M224 96h16v8h8v88h-32v-88h8z"/>
+
+  <!-- person in front -->
+  <path fill="#dbe3ea" d="M176 72h16v8h8v16h-8v8h-16v-8h-8V80h8z"/>
+  <path fill="#dbe3ea" d="M168 112h32v8h8v72h-48v-72h8z"/>
 </svg>
