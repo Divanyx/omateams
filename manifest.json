@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "id": "omateams",
+  "name": "Omateams",
+  "version": "0.1.0",
+  "author": "Divanyx",
+  "license": "MIT",
+  "homepage": "https://github.com/Divanyx/omateams",
+  "description": "Microsoft Teams for Omarchy: the real Teams web client in its own window, re-skinned live with your Omarchy theme. Sign in the normal way, keep calls, meetings and screen sharing, and get an unread badge in the bar plus desktop notifications. Every Fluent design token is remapped to colors.toml, corners follow Hyprland's rounding, and a theme switch restyles the open window without a reload.",
+  "kinds": [
+    "service",
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "service": "ui/Service.qml",
+    "barWidget": "ui/BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Omateams",
+    "description": "Unread Teams badge in the bar; Teams itself opens as its own Omarchy-themed window.",
+    "category": "Communication",
+    "aliases": [
+      "teams",
+      "microsoft teams",
+      "msteams",
+      "chat",
+      "meetings"
+    ],
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "showBarIcon": true,
+      "showCount": true,
+      "runInBackground": true,
+      "notifications": "On",
+      "followTheme": true,
+      "useShellFont": true,
+      "zoom": 100,
+      "closeAction": "Hide window",
+      "url": "https://teams.cloud.microsoft/"
+    },
+    "schema": [
+      {
+        "key": "showBarIcon",
+        "type": "boolean",
+        "label": "Show the icon in the bar",
+        "defaultValue": true,
+        "description": "Turn this off to keep Teams running without an icon in the bar. Bind a key to open it instead: o.bind(\"SUPER + SHIFT + T\", \"Teams\", \"omateams toggle\")"
+      },
+      {
+        "key": "showCount",
+        "type": "boolean",
+        "label": "Show the unread count next to the icon",
+        "defaultValue": true
+      },
+      {
+        "key": "runInBackground",
+        "type": "boolean",
+        "label": "Start Teams hidden with the shell",
+        "defaultValue": true,
+        "description": "Launches the Teams window in the background when the bar loads, so the unread badge and notifications work before you open it. Costs the memory of one browser tab."
+      },
+      {
+        "key": "notifications",
+        "type": "enum",
+        "label": "Desktop notifications",
+        "options": [
+          "On",
+          "Off"
+        ],
+        "defaultValue": "On",
+        "description": "Forwards Teams' own notifications to the Omarchy notification daemon. Clicking one opens the conversation."
+      },
+      {
+        "key": "followTheme",
+        "type": "boolean",
+        "label": "Re-skin Teams with the Omarchy theme",
+        "defaultValue": true,
+        "description": "Maps every Fluent design token to your theme's colors.toml and follows theme switches live. Off leaves Teams with Microsoft's own look."
+      },
+      {
+        "key": "useShellFont",
+        "type": "boolean",
+        "label": "Use the shell font",
+        "defaultValue": true,
+        "description": "Renders Teams in the same monospace family as the bar and menus. Off keeps Teams' default sans-serif."
+      },
+      {
+        "key": "zoom",
+        "type": "integer",
+        "label": "Zoom (%)",
+        "min": 50,
+        "max": 200,
+        "step": 10,
+        "defaultValue": 100
+      },
+      {
+        "key": "closeAction",
+        "type": "enum",
+        "label": "Closing the window",
+        "options": [
+          "Hide window",
+          "Quit"
+        ],
+        "defaultValue": "Hide window",
+        "description": "Hide keeps Teams running for the badge and notifications; Quit ends the process. Ctrl+Q always quits."
+      },
+      {
+        "key": "url",
+        "type": "string",
+        "label": "Teams URL",
+        "defaultValue": "https://teams.cloud.microsoft/",
+        "description": "Change this only if your organisation uses a different Teams endpoint."
+      }
+    ]
+  }
+}

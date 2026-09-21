@@ -1,0 +1,20 @@
+[Desktop Entry]
+Type=Application
+Name=Microsoft Teams (Omateams)
+GenericName=Team chat
+Comment=Microsoft Teams in an Omarchy-themed window
+Exec=omateams show
+Icon=omateams
+Terminal=false
+Categories=Network;Chat;InstantMessaging;Office;
+Keywords=teams;chat;microsoft;meetings;
+StartupWMClass=omateams
+Actions=background;quit;
+
+[Desktop Action background]
+Name=Start in background
+Exec=omateams --hidden
+
+[Desktop Action quit]
+Name=Quit Teams
+Exec=omateams quit

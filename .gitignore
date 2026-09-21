@@ -1,0 +1,9 @@
+# qmake build products (the build runs in ~/.cache/omateams/build)
+build/
+*.o
+moc_*
+qrc_*.cpp
+Makefile
+.qmake.stash
+host/omateams
+node_modules/
