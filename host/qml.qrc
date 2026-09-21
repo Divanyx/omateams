@@ -1,0 +1,8 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+  <qresource prefix="/">
+    <file>qml/Main.qml</file>
+    <file>qml/AuthWindow.qml</file>
+    <file>qml/Theme.js</file>
+  </qresource>
+</RCC>
