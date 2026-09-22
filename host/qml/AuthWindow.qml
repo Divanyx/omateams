@@ -11,6 +11,8 @@ Window {
   property alias view: authView
   property var profile: null
   property color background: "#101315"
+  // The main window, which owns the theme and the security-key dialog.
+  property var host: null
 
   width: 560
   height: 720
@@ -29,9 +31,16 @@ Window {
     settings.javascriptCanOpenWindows: true
     settings.javascriptCanAccessClipboard: true
 
+    onJavaScriptConsoleMessage: function(level, message) { if (root.host) root.host.reportWebAuth(message) }
+
     onWindowCloseRequested: root.close()
     // Redirect chains inside the login flow stay in this dialog.
     onNewWindowRequested: function(request) { request.openIn(authView) }
     onPermissionRequested: function(permission) { permission.deny() }
+    // Passkeys and security keys are used right here, on the sign-in page.
+    onWebAuthUxRequested: function(request) {
+      if (root.host) root.host.showWebAuthUx(request, root)
+      else request.cancel()
+    }
   }
 }

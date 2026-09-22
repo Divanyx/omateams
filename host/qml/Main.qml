@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Window
 import QtWebEngine
 import "Theme.js" as Theme
+import "WebAuth.js" as WebAuth
 
 // The Teams window. The real Teams web client runs in a WebEngineView; this
 // file owns everything around it: the persistent profile, the Omarchy theme
@@ -33,6 +34,7 @@ Window {
   readonly property real zoom: Math.max(0.5, Math.min(3, (Number(settings.zoom) || 100) / 100))
 
   property var themeColors: ({})
+  readonly property var themePalette: Theme.palette(themeColors)
   property string themeCss: ""
   property int rounding: -1
   property int roundingRequest: -1
@@ -72,6 +74,7 @@ Window {
   onFontFamilyChanged: if (ready) rebuildCss()
 
   Component.onCompleted: {
+    installWebAuthScript()
     loadSettings()
     restoreGeometry()
     loadTheme()
@@ -124,6 +127,19 @@ Window {
     var script = WebEngine.script()
     script.name = "omateams-theme"
     script.sourceCode = Theme.pageScript(themeCss)
+    script.injectionPoint = WebEngineScript.DocumentCreation
+    script.worldId = WebEngineScript.MainWorld
+    script.runOnSubframes = true
+    profile.userScripts.insert(script)
+  }
+
+  // Runs for every page and frame, theme or not: it is the only thing standing
+  // between a passkey prompt that cannot be served and a sign-in page that
+  // spins for good. See WebAuth.js.
+  function installWebAuthScript() {
+    var script = WebEngine.script()
+    script.name = "omateams-webauth"
+    script.sourceCode = WebAuth.pageScript()
     script.injectionPoint = WebEngineScript.DocumentCreation
     script.worldId = WebEngineScript.MainWorld
     script.runOnSubframes = true
@@ -244,6 +260,16 @@ Window {
   }
 
   // ------------------------------------------------------------ notifications
+  // The security key is the one kind of passkey this window can use: Chromium
+  // on Linux has no authenticator of its own, and the phone-and-QR-code route
+  // needs a Chromium UI that QtWebEngine does not carry.
+  function reportWebAuth(message) {
+    if (String(message).indexOf(WebAuth.MARKER) !== 0) return
+    Sys.run("notify-send", ["-a", "Microsoft Teams", "-i", "omateams",
+      "Passkey sign-in did not work",
+      "No security key answered. Passkeys kept on this device or on your phone cannot be used here \u2014 sign in with your password or the Authenticator app."])
+  }
+
   function presentNotification(notification) {
     if (!notificationsEnabled) { notification.close(); return }
     var id = Sys.runCapture("notify-send", [
@@ -333,6 +359,24 @@ Window {
   Shortcut { sequences: ["Ctrl+Shift+T"]; onActivated: { win.loadTheme(); win.refreshRounding() } }
 
   Component { id: authWindow; AuthWindow {} }
+  Component { id: webAuthDialog; WebAuthDialog {} }
+
+  // Chromium leaves the whole WebAuthn user experience to the application: the
+  // PIN, the account to use, the "touch your key now" and the reason a key was
+  // refused all arrive here as a request that waits for an answer. A window
+  // that ignores it shows a sign-in that can never finish, so the dialog takes
+  // the request over and answers it in every case, closing included.
+  function showWebAuthUx(request, parentWindow) {
+    var dialog = webAuthDialog.createObject(parentWindow, {
+      request: request,
+      pal: win.themePalette,
+      radius: win.rounding >= 0 ? win.rounding : 8,
+      transientParent: parentWindow
+    })
+    if (!dialog) { request.cancel(); return }
+    dialog.show()
+    dialog.requestActivate()
+  }
 
   WebEngineProfile {
     id: profile
@@ -367,6 +411,7 @@ Window {
     settings.dnsPrefetchEnabled: true
 
     onTitleChanged: win.parseTitle()
+    onJavaScriptConsoleMessage: function(level, message) { win.reportWebAuth(message) }
     onUrlChanged: statusTimer.restart()
 
     onPermissionRequested: function(permission) {
@@ -374,11 +419,13 @@ Window {
       else permission.deny()
     }
 
+    onWebAuthUxRequested: function(request) { win.showWebAuthUx(request, win) }
+
     onNewWindowRequested: function(request) {
       var url = String(request.requestedUrl)
       var dialog = request.destination === WebEngineNewWindowRequest.InNewDialog
       if (dialog || win.isSignInOrigin(url)) {
-        var popup = authWindow.createObject(win, { profile: profile, background: win.color })
+        var popup = authWindow.createObject(win, { profile: profile, background: win.color, host: win })
         if (popup) {
           request.openIn(popup.view)
           popup.show()
