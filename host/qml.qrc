@@ -3,6 +3,8 @@
   <qresource prefix="/">
     <file>qml/Main.qml</file>
     <file>qml/AuthWindow.qml</file>
+    <file>qml/WebAuthDialog.qml</file>
     <file>qml/Theme.js</file>
+    <file>qml/WebAuth.js</file>
   </qresource>
 </RCC>

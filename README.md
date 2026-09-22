@@ -131,6 +131,15 @@ under `/usr/share/omarchy/themes`.
   `~/.local/share/omateams/QtWebEngine/`, like any browser or Omarchy web app.
   Sign-in popups open in an in-app dialog so the session lands in that profile;
   other links open in your default browser.
+- **Passkeys and security keys.** A USB security key works: plug it in and
+  omateams shows the PIN, the account list and the "touch your key" prompt in a
+  themed dialog. A passkey kept by the device itself, by a phone over the QR
+  code, or inside another browser's password manager does not: Chromium on
+  Linux has no built-in authenticator, QtWebEngine carries no UI for the
+  phone-and-QR route, and one browser cannot read another's passkeys. Such a
+  sign-in used to spin forever and block the next attempt as well; it now gives
+  up after the site's own timeout, tells you so, and leaves the page free to
+  offer another way in.
 - **Memory.** Teams is a heavy web app; expect the footprint of a browser tab
   with Teams in it. `runInBackground: false` starts it only on demand.
 - **Screen sharing** goes through PipeWire and the desktop portal
