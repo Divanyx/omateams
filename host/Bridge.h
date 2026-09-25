@@ -7,6 +7,7 @@
 #include <QPointer>
 #include <QString>
 #include <QStringList>
+#include <QWindow>
 
 class QLocalSocket;
 class QProcess;
@@ -36,11 +37,16 @@ public:
     Q_INVOKABLE void run(const QString &program, const QStringList &arguments);
     Q_INVOKABLE int runCapture(const QString &program, const QStringList &arguments);
     Q_INVOKABLE void reply(int connection, const QString &text);
+    Q_INVOKABLE void watchExposure(QWindow *window);
 
 signals:
     void fileChanged(const QString &path);
     void processFinished(int id, int exitCode, const QString &output);
     void command(int connection, const QString &line);
+    void exposed(QWindow *window);
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     void acceptConnection();

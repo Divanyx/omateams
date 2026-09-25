@@ -9,6 +9,7 @@
 #include <QSaveFile>
 #include <QStandardPaths>
 #include <QTextStream>
+#include <QWindow>
 
 Bridge::Bridge(QLocalServer *server, QObject *parent)
     : QObject(parent), m_server(server)
@@ -136,6 +137,31 @@ void Bridge::reply(int connection, const QString &text)
     connect(socket, &QLocalSocket::disconnected, socket, &QObject::deleteLater);
     if (socket->state() == QLocalSocket::UnconnectedState)
         socket->deleteLater();
+}
+
+// QML sees no expose events. Hyprland suspends the surfaces of a workspace
+// that is not shown, Qt treats a suspended window as unexposed, and when the
+// workspace comes back the page has to be told to draw again (see Main.qml).
+void Bridge::watchExposure(QWindow *window)
+{
+    if (!window)
+        return;
+    window->setProperty("omateamsExposed", window->isExposed());
+    window->installEventFilter(this);
+}
+
+bool Bridge::eventFilter(QObject *watched, QEvent *event)
+{
+    if (event->type() == QEvent::Expose) {
+        if (auto *window = qobject_cast<QWindow *>(watched)) {
+            const bool was = window->property("omateamsExposed").toBool();
+            const bool now = window->isExposed();
+            window->setProperty("omateamsExposed", now);
+            if (now && !was)
+                emit exposed(window);
+        }
+    }
+    return QObject::eventFilter(watched, event);
 }
 
 void Bridge::acceptConnection()

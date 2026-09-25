@@ -75,6 +75,7 @@ Window {
 
   Component.onCompleted: {
     installWebAuthScript()
+    Sys.watchExposure(win)
     loadSettings()
     restoreGeometry()
     loadTheme()
@@ -195,6 +196,21 @@ Window {
     win.raise()
     win.requestActivate()
     focusTimer.restart()
+  }
+
+  // Hyprland suspends a window whose workspace is not on screen. When it comes
+  // back, Qt draws the scene again but Chromium sends no new frame until the
+  // page changes, so the view stays black until the next click or keypress.
+  // A one-pixel change on the next animation frame makes it paint.
+  function repaintPage() {
+    view.runJavaScript(
+      "requestAnimationFrame(function () {"
+      + " var d = document.getElementById('omateams-repaint');"
+      + " if (!d) { d = document.createElement('div'); d.id = 'omateams-repaint';"
+      + "   d.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;background:#000;pointer-events:none;z-index:2147483647';"
+      + "   (document.body || document.documentElement).appendChild(d); }"
+      + " d.style.opacity = d.style.opacity === '0.01' ? '0.02' : '0.01';"
+      + "})")
   }
 
   function restoreGeometry() {
@@ -324,6 +340,7 @@ Window {
       }
     }
     function onCommand(connection, line) { win.handleCommand(connection, line) }
+    function onExposed(window) { if (window === win) win.repaintPage() }
   }
 
   Connections {
