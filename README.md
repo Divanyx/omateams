@@ -37,17 +37,20 @@ Two parts:
 
 ```bash
 omarchy plugin add https://github.com/Divanyx/omateams.git --enable
-~/.config/omarchy/plugins/omateams/install.sh
 ```
 
-`install.sh` builds the host (a few seconds with `qmake6`, dependencies
-`qt6-webengine`, `qt6-declarative`, `libnotify`, `jq`, `base-devel` are
-installed with `pacman` if missing) and puts it in
+That is all. When the shell loads the plugin, it builds the Teams window (a
+small Qt program, a few seconds with `qmake6`) and installs it to
 `~/.local/share/omateams/bin/omateams`, with a symlink in `~/.local/bin`, a
-desktop entry and an icon. Then:
+desktop entry and an icon. A notification says when it is ready; then:
 
 - click the Teams icon in the bar, or run `omateams`
 - sign in as you would in a browser
+
+The build needs `qt6-webengine`, `qt6-declarative`, `libnotify`, `jq` and
+`base-devel`. If one is missing, a notification says so and a click on the
+Teams icon opens a terminal that installs it with `pacman` (this is the only
+step that asks for your password) and finishes the build.
 
 The window opens tiled like any other; a Hyprland rule can float or pin it
 (`class: omateams`). Optional keybinding in `~/.config/hypr/bindings.lua`:
@@ -56,9 +59,14 @@ The window opens tiled like any other; a Hyprland rule can float or pin it
 o.bind("SUPER + SHIFT + T", "Teams", "omateams toggle")
 ```
 
-Update with `omarchy plugin update omateams` and re-run `install.sh` so the
-host matches. Remove with `~/.config/omarchy/plugins/omateams/uninstall.sh`
-(`--purge` also deletes the signed-in profile) and `omarchy plugin remove omateams`.
+`omarchy plugin update omateams` is enough to update: on the next shell start
+the plugin notices the new sources (or a Qt upgrade) and rebuilds the window.
+An open Teams window keeps running and picks up the new build when it is next
+started. `~/.config/omarchy/plugins/omateams/install.sh` still works by hand and
+rebuilds unconditionally.
+
+Remove with `~/.config/omarchy/plugins/omateams/uninstall.sh` (`--purge` also
+deletes the signed-in profile) and `omarchy plugin remove omateams`.
 
 ## Bar widget
 

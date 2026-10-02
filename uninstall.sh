@@ -23,7 +23,7 @@ rm -f "$data_home/applications/omateams.desktop"
 rm -f "$data_home/icons/hicolor/scalable/apps/omateams.svg" "$data_home/icons/hicolor/256x256/apps/omateams.png"
 gtk-update-icon-cache -q "$data_home/icons/hicolor" 2>/dev/null || true
 update-desktop-database -q "$data_home/applications" 2>/dev/null || true
-rm -rf "$prefix/bin" "${XDG_CACHE_HOME:-$HOME/.cache}/omateams"
+rm -rf "$prefix/bin" "$prefix/build-stamp" "${XDG_CACHE_HOME:-$HOME/.cache}/omateams"
 rm -rf "${XDG_RUNTIME_DIR:-/tmp}/omateams"
 
 if (( purge )); then

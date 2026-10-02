@@ -24,6 +24,8 @@ Item {
   readonly property string configDir: (Quickshell.env("XDG_CONFIG_HOME") || (home + "/.config")) + "/omateams"
   readonly property string settingsPath: configDir + "/settings.json"
   readonly property string hostBinary: (Quickshell.env("XDG_DATA_HOME") || (home + "/.local/share")) + "/omateams/bin/omateams"
+  // install.sh sits next to ui/ in the plugin folder `omarchy plugin add` cloned.
+  readonly property string installScript: decodeURIComponent(String(Qt.resolvedUrl("../install.sh")).replace(/^file:\/\//, ""))
 
   property var settings: ({})
   property bool settingsReceived: false
@@ -36,9 +38,14 @@ Item {
   property string title: ""
   property int pid: 0
   property bool autostartAttempted: false
+  // "", "building", "needs-deps" or "failed": the state of the automatic build.
+  property string buildState: ""
 
-  readonly property string tooltip: !installedChecked ? "Microsoft Teams"
-    : !installed ? "Microsoft Teams — host not built yet: run install.sh in the plugin folder"
+  readonly property string tooltip: buildState === "building" ? "Microsoft Teams — setting up the Teams window…"
+    : buildState === "needs-deps" ? "Microsoft Teams — build tools missing: click to install them"
+    : buildState === "failed" ? "Microsoft Teams — setup failed: click to retry in a terminal"
+    : !installedChecked ? "Microsoft Teams"
+    : !installed ? "Microsoft Teams — Teams window not set up yet"
     : !running ? "Microsoft Teams — not running (click to start)"
     : unread > 0 ? "Microsoft Teams — " + unread + " unread"
     : activity ? "Microsoft Teams — new activity"
@@ -86,8 +93,34 @@ Item {
   function refresh() { checkInstalled(); statusFile.reload() }
 
   function command(name) {
-    if (!installed) { checkInstalled(); return }
+    if (buildState === "needs-deps" || buildState === "failed") { installInTerminal(); return }
+    if (!installed) { ensureHost(); return }
     Quickshell.execDetached([hostBinary, name])
+  }
+
+  // ------------------------------------------------------------ host build
+  // `omarchy plugin add` only clones the repository, and the Teams window is a
+  // small Qt program that has to be compiled. The service builds it on load;
+  // install.sh --if-needed returns at once when the binary already matches the
+  // plugin version, its sources and the installed Qt, so after `omarchy plugin
+  // update` or a Qt upgrade the next shell start rebuilds it without asking.
+  function ensureHost() {
+    if (builder.running) return
+    buildState = "building"
+    builder.command = ["bash", installScript, "--if-needed"]
+    builder.running = true
+  }
+
+  // Missing build dependencies need pacman and therefore sudo, which only a
+  // terminal can ask for. That happens on a click, never on its own.
+  function installInTerminal() {
+    buildState = ""
+    Quickshell.execDetached(["omarchy-launch-floating-terminal-with-presentation",
+      "bash '" + installScript.replace(/'/g, "'\\''") + "'"])
+  }
+
+  function notify(body) {
+    Quickshell.execDetached(["notify-send", "-a", "Omateams", "-i", "omateams", "Microsoft Teams", body])
   }
 
   // ------------------------------------------------------------ status
@@ -122,7 +155,7 @@ Item {
     installCheck.running = true
   }
 
-  Component.onCompleted: checkInstalled()
+  Component.onCompleted: ensureHost()
 
   FileView {
     id: statusFile
@@ -142,6 +175,28 @@ Item {
       root.installed = exitCode === 0
       root.installedChecked = true
       root.maybeAutostart()
+    }
+  }
+
+  Process {
+    id: builder
+    running: false
+    command: []
+    onExited: function(exitCode) {
+      if (exitCode === 0) {
+        root.buildState = ""
+      } else if (exitCode === 10) {
+        root.buildState = ""
+        if (!root.running)
+          root.notify("The Teams window is ready. Click the Teams icon in the bar to sign in.")
+      } else if (exitCode === 3) {
+        root.buildState = "needs-deps"
+        root.notify("Build tools for the Teams window are missing. Click the Teams icon in the bar to install them.")
+      } else {
+        root.buildState = "failed"
+        root.notify("Setting up the Teams window failed. Click the Teams icon in the bar to retry in a terminal.")
+      }
+      root.checkInstalled()
     }
   }
 
@@ -168,7 +223,7 @@ Item {
   }
 
   // The install check is cheap; repeating it lets the widget notice a host
-  // built after the shell started without a restart.
+  // built in a terminal after the shell started without a restart.
   Timer {
     interval: 60000
     repeat: true
