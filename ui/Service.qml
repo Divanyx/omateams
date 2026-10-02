@@ -40,9 +40,14 @@ Item {
   property bool autostartAttempted: false
   // "", "building", "needs-deps" or "failed": the state of the automatic build.
   property string buildState: ""
+  property string missingPackages: ""
+  // The exit code and the output arrive separately; the result is handled
+  // once both are in, whichever comes first.
+  property int builderExit: -1
+  property var builderText: null
 
   readonly property string tooltip: buildState === "building" ? "Microsoft Teams — setting up the Teams window…"
-    : buildState === "needs-deps" ? "Microsoft Teams — build tools missing: click to install them"
+    : buildState === "needs-deps" ? "Microsoft Teams — needs " + missingPackages + ": click to open the package installer"
     : buildState === "failed" ? "Microsoft Teams — setup failed: click to retry in a terminal"
     : !installedChecked ? "Microsoft Teams"
     : !installed ? "Microsoft Teams — Teams window not set up yet"
@@ -93,7 +98,8 @@ Item {
   function refresh() { checkInstalled(); statusFile.reload() }
 
   function command(name) {
-    if (buildState === "needs-deps" || buildState === "failed") { installInTerminal(); return }
+    if (buildState === "needs-deps") { openPackageInstaller(); return }
+    if (buildState === "failed") { installInTerminal(); return }
     if (!installed) { ensureHost(); return }
     Quickshell.execDetached([hostBinary, name])
   }
@@ -106,13 +112,22 @@ Item {
   // update` or a Qt upgrade the next shell start rebuilds it without asking.
   function ensureHost() {
     if (builder.running) return
-    buildState = "building"
+    // A retry while packages are missing stays quiet until something changes.
+    if (buildState !== "needs-deps") buildState = "building"
+    builderExit = -1
+    builderText = null
     builder.command = ["bash", installScript, "--if-needed"]
     builder.running = true
   }
 
-  // Missing build dependencies need pacman and therefore sudo, which only a
-  // terminal can ask for. That happens on a click, never on its own.
+  // The plugin installs no system packages itself. A missing build dependency
+  // is named in a notification, and a click opens Omarchy's own package
+  // installer; the retry timer below builds as soon as the packages are there.
+  function openPackageInstaller() {
+    Quickshell.execDetached(["omarchy-launch-floating-terminal-with-presentation", "omarchy-pkg-install"])
+  }
+
+  // A failed build is retried in a terminal, where its output can be read.
   function installInTerminal() {
     buildState = ""
     Quickshell.execDetached(["omarchy-launch-floating-terminal-with-presentation",
@@ -182,22 +197,35 @@ Item {
     id: builder
     running: false
     command: []
-    onExited: function(exitCode) {
-      if (exitCode === 0) {
-        root.buildState = ""
-      } else if (exitCode === 10) {
-        root.buildState = ""
-        if (!root.running)
-          root.notify("The Teams window is ready. Click the Teams icon in the bar to sign in.")
-      } else if (exitCode === 3) {
-        root.buildState = "needs-deps"
-        root.notify("Build tools for the Teams window are missing. Click the Teams icon in the bar to install them.")
-      } else {
-        root.buildState = "failed"
-        root.notify("Setting up the Teams window failed. Click the Teams icon in the bar to retry in a terminal.")
-      }
-      root.checkInstalled()
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: { root.builderText = text; root.buildFinished() }
     }
+    onExited: function(exitCode) { root.builderExit = exitCode; root.buildFinished() }
+  }
+
+  function buildFinished() {
+    if (builderExit < 0 || builderText === null) return
+    var exitCode = builderExit
+    builderExit = -1
+    if (exitCode === 0) {
+      buildState = ""
+    } else if (exitCode === 10) {
+      buildState = ""
+      if (!running)
+        notify("The Teams window is ready. Click the Teams icon in the bar to sign in.")
+    } else if (exitCode === 3) {
+      var missing = String(builderText).trim().split(/\s+/).filter(function(p) { return p.length > 0 }).join(", ") || "build packages"
+      var changed = buildState !== "needs-deps" || missingPackages !== missing
+      missingPackages = missing
+      buildState = "needs-deps"
+      if (changed)
+        notify("The Teams window needs " + missing + ". Click the Teams icon in the bar to open the package installer; setup continues on its own once they are installed.")
+    } else {
+      buildState = "failed"
+      notify("Setting up the Teams window failed. Click the Teams icon in the bar to retry in a terminal.")
+    }
+    checkInstalled()
   }
 
   Process {
@@ -227,7 +255,7 @@ Item {
   Timer {
     interval: 60000
     repeat: true
-    running: !root.installed
-    onTriggered: root.checkInstalled()
+    running: !root.installed || root.buildState === "needs-deps"
+    onTriggered: root.buildState === "needs-deps" ? root.ensureHost() : root.checkInstalled()
   }
 }

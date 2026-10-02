@@ -3,7 +3,8 @@
 # The Omarchy plugin itself needs no build; `omarchy plugin add` clones it and
 # its service runs this script with --if-needed when the shell loads it, which
 # adds the one native piece the shell cannot provide. Running it by hand does
-# the same and also installs missing build dependencies with pacman.
+# the same and always rebuilds. It installs no system packages: missing build
+# dependencies are listed, and installing them stays with the user.
 set -euo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -14,12 +15,11 @@ build="${XDG_CACHE_HOME:-$HOME/.cache}/omateams/build"
 
 usage() {
   cat <<USAGE
-Usage: install.sh [--uninstall] [--no-deps] [--if-needed]
+Usage: install.sh [--uninstall] [--if-needed]
 
 Builds the omateams host from ./host with qmake6 and installs it to
 $bindir (plus a symlink in ~/.local/bin), a desktop entry and an icon.
   --uninstall   remove everything install.sh created (keeps the Teams profile)
-  --no-deps     skip the pacman dependency check
   --if-needed   build only when the sources or Qt changed since the last build;
                 never prompts; exits 0 when the host is already current,
                 10 after building it, 3 when build dependencies are missing
@@ -27,34 +27,30 @@ $bindir (plus a symlink in ~/.local/bin), a desktop entry and an icon.
 USAGE
 }
 
-install_deps=1
 if_needed=0
 for arg in "$@"; do
   case "$arg" in
     --uninstall) exec "$here/uninstall.sh" ;;
-    --no-deps) install_deps=0 ;;
-    --if-needed) if_needed=1; install_deps=0 ;;
+    --if-needed) if_needed=1 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "install.sh: unknown option: $arg" >&2; usage >&2; exit 2 ;;
   esac
 done
 
+# The dependency check lists the missing pieces on stdout, one per line, so
+# the plugin can name them in its notification.
 need=()
 if command -v pacman >/dev/null; then
   for pkg in qt6-webengine qt6-declarative libnotify jq; do
-    pacman -Qi "$pkg" &>/dev/null || need+=("$pkg")
+    pacman -Q "$pkg" &>/dev/null || need+=("$pkg")
   done
 fi
 { command -v g++ >/dev/null && command -v make >/dev/null; } || need+=(base-devel)
 if (( ${#need[@]} )); then
-  if (( if_needed )); then
-    echo "install.sh: missing build dependencies: ${need[*]}" >&2
-    exit 3
-  fi
-  if (( install_deps )) && command -v pacman >/dev/null; then
-    echo "Installing build dependencies: ${need[*]}"
-    sudo pacman -S --needed --noconfirm "${need[@]}"
-  fi
+  printf '%s\n' "${need[@]}"
+  echo "install.sh: missing packages: ${need[*]}" >&2
+  echo "Install them (Omarchy menu > Install > Package) and run install.sh again." >&2
+  exit 3
 fi
 
 qmake=$(command -v qmake6 || true)
