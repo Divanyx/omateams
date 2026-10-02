@@ -48,9 +48,10 @@ desktop entry and an icon. A notification says when it is ready; then:
 - sign in as you would in a browser
 
 The build needs `qt6-webengine`, `qt6-declarative`, `libnotify`, `jq` and
-`base-devel`. If one is missing, a notification says so and a click on the
-Teams icon opens a terminal that installs it with `pacman` (this is the only
-step that asks for your password) and finishes the build.
+`base-devel`; a stock Omarchy has all but `qt6-webengine`. The plugin installs
+no system packages itself: if one is missing, a notification names it, a click
+on the Teams icon opens Omarchy's package installer, and setup continues on its
+own within a minute once the package is there.
 
 The window opens tiled like any other; a Hyprland rule can float or pin it
 (`class: omateams`). Optional keybinding in `~/.config/hypr/bindings.lua`:
