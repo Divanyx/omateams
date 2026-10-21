@@ -11,6 +11,8 @@
 #include <QTextStream>
 #include <QWindow>
 
+#include <unistd.h>
+
 Bridge::Bridge(QLocalServer *server, QObject *parent)
     : QObject(parent), m_server(server)
 {
@@ -58,6 +60,19 @@ QString Bridge::env(const QString &name) const
 int Bridge::pid() const
 {
     return static_cast<int>(QCoreApplication::applicationPid());
+}
+
+QString Bridge::executable() const
+{
+    return QCoreApplication::applicationFilePath();
+}
+
+// Leaves without tearing Chromium down. Once the screen has been shared, its
+// GPU thread has lost its EGL display (see Main.qml), and the regular
+// shutdown dies on it with SIGTRAP and a core dump.
+void Bridge::exitNow(int code)
+{
+    ::_exit(code);
 }
 
 bool Bridge::exists(const QString &path) const

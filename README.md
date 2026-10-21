@@ -109,7 +109,8 @@ omateams open <link>     open a Teams meeting or chat link (https://teams.micros
                          or msteams:) in the window; Omaoutlook sends invitations here
 omateams show | hide
 omateams reload          start Teams over in a fresh page (frees what it piled up)
-omateams status          JSON: running, unread, visible, title, pid, memory (MiB)
+omateams status          JSON: running, unread, visible, title, pid, memory and
+                         hostMemory (MiB), sharing
 omateams reload-theme    re-read colors.toml and Hyprland's rounding
 omateams quit
 ```
@@ -169,8 +170,23 @@ under `/usr/share/omarchy/themes`.
   badge is back within a minute. `omateams reload` does the same on demand,
   and `memoryLimit: 0` turns it off. `runInBackground: false` starts Teams
   only on demand.
+
+  Past a hard limit, twice the reload limit and at least 8 GB counted over
+  the page and the window process together, nothing waits for the window to
+  go out of sight. A running screen share is ended (the call goes on), a call
+  is left alone and the page is reloaded right after it, and otherwise the
+  page is reloaded at once; each comes with a notification. While the screen
+  is shared, the size is read every ten seconds instead of every five
+  minutes, since that is where Teams has been seen to grow by over 40 GB in
+  half an hour.
 - **Screen sharing** goes through PipeWire and the desktop portal
-  (`xdg-desktop-portal-hyprland`), which Omarchy ships.
+  (`xdg-desktop-portal-hyprland`), which Omarchy ships. When a share ends,
+  Chromium's PipeWire capturer terminates the EGL display it shares with the
+  GPU thread, which QtWebEngine runs inside the window process. Every frame
+  after that fails to get an EGL sync, and discarding the page or quitting
+  ends in SIGTRAP. So once this process has shared the screen, a reload
+  restarts the whole window process (shown or hidden as before, still signed
+  in) and quitting skips Chromium's teardown.
 - **What theming can't reach.** Colors baked into images, avatars and a few
   hard-coded brand accents in Teams' own SVGs stay as they are.
 - Omateams is not affiliated with Microsoft. Microsoft Teams is a trademark of

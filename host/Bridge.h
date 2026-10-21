@@ -27,6 +27,8 @@ public:
     Q_INVOKABLE QString stateDir() const;
     Q_INVOKABLE QString env(const QString &name) const;
     Q_INVOKABLE int pid() const;
+    Q_INVOKABLE QString executable() const;
+    Q_INVOKABLE void exitNow(int code);
 
     Q_INVOKABLE bool exists(const QString &path) const;
     Q_INVOKABLE QString readFile(const QString &path) const;
