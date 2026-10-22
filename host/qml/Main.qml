@@ -469,7 +469,8 @@ Window {
     var path = m[1]
     try { path = decodeURIComponent(path) } catch (e) {}
     var query = m[2] || ""
-    if (/^\/l\/meetup-join\//i.test(path)) query += (query ? "&" : "?") + "anon=true"
+    if (/^\/l\/meetup-join\//i.test(path) && !/[?&]anon=/i.test(query))
+      query += (query ? "&" : "?") + "anon=true"
     return "#" + path + query
   }
 
