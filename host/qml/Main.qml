@@ -437,8 +437,40 @@ Window {
     var u = String(url || "")
     if (/^msteams:/i.test(u)) u = "https://teams.microsoft.com" + u.replace(/^msteams:\/*/i, "/")
     showWindow()
-    if (isTeamsOrigin(u)) view.url = u
-    else if (u.length > 0) Qt.openUrlExternally(u)
+    if (isTeamsOrigin(u)) {
+      if (!routeDeepLink(u)) view.url = u
+    } else if (u.length > 0) Qt.openUrlExternally(u)
+  }
+
+  // Loading a /l/ deep link (a meeting join, chat or channel link) reloads the
+  // whole client before it shows the lobby. Teams' own launcher ends on
+  // /v2/#/l/... instead, and the running app handles that hash in place, so
+  // hand an already loaded client the same hash. Returns false when the link
+  // has to load as a page: no /l/ path, or no client loaded yet.
+  property string pendingDeepLink: ""
+
+  function routeDeepLink(url) {
+    var route = deepLinkRoute(url)
+    if (!route || view.loading
+        || !hostMatches(hostOf(view.url), ["teams.cloud.microsoft", "teams.microsoft.com", "teams.live.com"]))
+      return false
+    pendingDeepLink = url
+    view.runJavaScript("location.hash = " + JSON.stringify(route) + ";")
+    deepLinkCheck.restart()
+    return true
+  }
+
+  // "https://teams.microsoft.com/l/meetup-join/19%3a...%40thread.v2/0?context=..."
+  // -> "#/l/meetup-join/19:...@thread.v2/0?context=...&anon=true", the form
+  // the launcher hands the client.
+  function deepLinkRoute(url) {
+    var m = String(url).match(/^https:\/\/[^\/]+(\/l\/[^?#]+)(\?[^#]*)?/i)
+    if (!m) return ""
+    var path = m[1]
+    try { path = decodeURIComponent(path) } catch (e) {}
+    var query = m[2] || ""
+    if (/^\/l\/meetup-join\//i.test(path)) query += (query ? "&" : "?") + "anon=true"
+    return "#" + path + query
   }
 
   function quit() {
@@ -590,6 +622,20 @@ Window {
     onTriggered: { win.loadTheme(); win.refreshRounding(); Sys.watch(win.colorsPath); Sys.watch(win.omarchyState) }
   }
   Timer { id: reloadTimer; interval: 1500; onTriggered: view.reload() }
+  // The client clears the hash once it has routed it. A hash still there
+  // means this client ignored it, so load the link as a page after all.
+  Timer {
+    id: deepLinkCheck
+    interval: 4000
+    onTriggered: {
+      var link = win.pendingDeepLink
+      win.pendingDeepLink = ""
+      if (!link) return
+      view.runJavaScript("location.hash", function (hash) {
+        if (String(hash || "").indexOf("#/l/") === 0) view.url = link
+      })
+    }
+  }
   // Waits for the discarded page's renderer to exit, for half a minute at most.
   Timer {
     id: reviveTimer
