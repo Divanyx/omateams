@@ -63,6 +63,9 @@ Window {
   readonly property int baselineDelayMs: 10 * 60 * 1000
   property real lastRecycle: 0
   property bool recycling: false
+  // A Teams page has finished loading in the view. Cleared the moment a new
+  // page is asked for, before the view itself reports that it is loading.
+  property bool clientReady: false
   property int recyclePid: 0
   // A page must stay out of sight this long before it is reloaded, so a
   // window someone just hid for a moment is never pulled from under them.
@@ -134,7 +137,7 @@ Window {
     Sys.watch(settingsPath)
     Sys.watch(configDir)
     ready = true
-    view.url = settings.url || defaultUrl
+    loadPage(settings.url || defaultUrl)
     if (startUrl.length > 0) openLink(startUrl)
     pageLoadedAt = Date.now()
     writeStatus()
@@ -375,6 +378,7 @@ Window {
     lastRecycle = Date.now()
     recyclePid = view.renderProcessPid
     recycling = true
+    clientReady = false
     view.visible = false
     view.lifecycleState = WebEngineView.LifecycleState.Discarded
     if (view.lifecycleState !== WebEngineView.LifecycleState.Discarded) {
@@ -393,6 +397,7 @@ Window {
     if (!recycling) return
     reviveTimer.stop()
     recycling = false
+    clientReady = false
     overdue = false
     hostWarned = false
     sharing = false
@@ -438,7 +443,7 @@ Window {
     if (/^msteams:/i.test(u)) u = "https://teams.microsoft.com" + u.replace(/^msteams:\/*/i, "/")
     showWindow()
     if (isTeamsOrigin(u)) {
-      if (!routeDeepLink(u)) view.url = u
+      if (!routeDeepLink(u)) loadPage(u)
     } else if (u.length > 0) Qt.openUrlExternally(u)
   }
 
@@ -449,9 +454,14 @@ Window {
   // has to load as a page: no /l/ path, or no client loaded yet.
   property string pendingDeepLink: ""
 
+  function loadPage(url) {
+    clientReady = false
+    view.url = url
+  }
+
   function routeDeepLink(url) {
     var route = deepLinkRoute(url)
-    if (!route || view.loading
+    if (!route || !clientReady || recycling || view.loading
         || !hostMatches(hostOf(view.url), ["teams.cloud.microsoft", "teams.microsoft.com", "teams.live.com"]))
       return false
     pendingDeepLink = url
@@ -633,7 +643,7 @@ Window {
       win.pendingDeepLink = ""
       if (!link) return
       view.runJavaScript("location.hash", function (hash) {
-        if (String(hash || "").indexOf("#/l/") === 0) view.url = link
+        if (String(hash || "").indexOf("#/l/") === 0) win.loadPage(link)
       })
     }
   }
@@ -712,6 +722,9 @@ Window {
     onTitleChanged: win.parseTitle()
     onJavaScriptConsoleMessage: function(level, message) { win.reportWebAuth(message); win.reportMedia(message) }
     onUrlChanged: statusTimer.restart()
+    onLoadingChanged: function(request) {
+      win.clientReady = request.status === WebEngineView.LoadSucceededStatus
+    }
 
     onPermissionRequested: function(permission) {
       if (win.isTeamsOrigin(permission.origin)) permission.grant()
