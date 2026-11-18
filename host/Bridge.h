@@ -7,6 +7,7 @@
 #include <QPointer>
 #include <QString>
 #include <QStringList>
+#include <QVariantMap>
 #include <QWindow>
 
 class QLocalSocket;
@@ -41,6 +42,7 @@ public:
     Q_INVOKABLE void reply(int connection, const QString &text);
     Q_INVOKABLE void watchExposure(QWindow *window);
     Q_INVOKABLE int processMemory(int pid) const;
+    Q_INVOKABLE QVariantMap memoryRoom() const;
 
 signals:
     void fileChanged(const QString &path);

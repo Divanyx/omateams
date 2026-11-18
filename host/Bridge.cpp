@@ -11,6 +11,7 @@
 #include <QTextStream>
 #include <QWindow>
 
+#include <climits>
 #include <unistd.h>
 
 Bridge::Bridge(QLocalServer *server, QObject *parent)
@@ -209,6 +210,88 @@ int Bridge::processMemory(int pid) const
         }
     }
     return found ? static_cast<int>(kib / 1024) : -1;
+}
+
+namespace {
+
+// The number after `key` on the line that starts with it, as /proc/meminfo
+// ("MemTotal:  16384 kB") and a cgroup's memory.stat ("active_file 4096")
+// write them, or -1.
+qint64 numberAfter(const QByteArray &text, const QByteArray &key)
+{
+    const QList<QByteArray> lines = text.split('\n');
+    for (const QByteArray &line : lines) {
+        if (!line.startsWith(key) || line.size() <= key.size() || line.at(key.size()) != ' ')
+            continue;
+        bool ok = false;
+        const qint64 value = line.mid(key.size()).trimmed().split(' ').value(0).toLongLong(&ok);
+        return ok ? value : -1;
+    }
+    return -1;
+}
+
+QByteArray contents(const QString &path)
+{
+    QFile file(path);
+    return file.open(QIODevice::ReadOnly | QIODevice::Text) ? file.readAll() : QByteArray();
+}
+
+} // namespace
+
+// How much memory there is for this process and how much of it is still to
+// be had, in MiB: the machine's, as the kernel counts it, or what the
+// tightest limit on the cgroups the process runs in leaves, whichever is
+// less. Page cache counts as free in both, as it is given up when memory is
+// needed. Empty when nothing can be read.
+QVariantMap Bridge::memoryRoom() const
+{
+    qint64 total = -1;
+    qint64 available = -1;
+
+    const QByteArray meminfo = contents(QStringLiteral("/proc/meminfo"));
+    const qint64 machine = numberAfter(meminfo, "MemTotal:");
+    const qint64 spare = numberAfter(meminfo, "MemAvailable:");
+    if (machine > 0 && spare >= 0) {
+        total = machine * 1024;
+        available = spare * 1024;
+    }
+
+    // "0::/user.slice/…/app.scope" names the cgroup; a limit may sit on it or
+    // on any of the groups above it.
+    const QString root = QStringLiteral("/sys/fs/cgroup");
+    QString dir;
+    const QList<QByteArray> groups = contents(QStringLiteral("/proc/self/cgroup")).split('\n');
+    for (const QByteArray &line : groups) {
+        if (line.startsWith("0::"))
+            dir = QDir::cleanPath(root + QString::fromUtf8(line.mid(3).trimmed()));
+    }
+    while (dir == root || dir.startsWith(root + QLatin1Char('/'))) {
+        bool limited = false;
+        bool counted = false;
+        const qint64 limit = contents(dir + QStringLiteral("/memory.max")).trimmed().toLongLong(&limited);
+        const qint64 current = contents(dir + QStringLiteral("/memory.current")).trimmed().toLongLong(&counted);
+        if (limited && counted && limit > 0) {
+            const QByteArray stat = contents(dir + QStringLiteral("/memory.stat"));
+            const qint64 cache = qMax<qint64>(0, numberAfter(stat, "inactive_file"))
+                + qMax<qint64>(0, numberAfter(stat, "active_file"));
+            const qint64 left = qMax<qint64>(0, limit - qMax<qint64>(0, current - cache));
+            if (available < 0 || left < available) {
+                total = limit;
+                available = left;
+            }
+        }
+        if (dir == root)
+            break;
+        dir = dir.left(dir.lastIndexOf(QLatin1Char('/')));
+    }
+
+    QVariantMap room;
+    if (total > 0 && available >= 0) {
+        const qint64 mib = 1024 * 1024;
+        room.insert(QStringLiteral("total"), static_cast<int>(qMin<qint64>(total / mib, INT_MAX)));
+        room.insert(QStringLiteral("available"), static_cast<int>(qMin<qint64>(available / mib, INT_MAX)));
+    }
+    return room;
 }
 
 void Bridge::acceptConnection()

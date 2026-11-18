@@ -114,7 +114,7 @@
         "max": 16384,
         "step": 256,
         "defaultValue": 2048,
-        "description": "Teams grows over a long session. Once its page uses more than this, and half again as much as it took when fresh, it is reloaded while the window has been out of sight for ten minutes and no call is running, at most once an hour. Past twice this (8 GB at least) a screen share is ended or the page reloaded right away. 0 turns both off."
+        "description": "Teams grows over a long session. Once its page uses more than this, and half again as much as it took when fresh, it is reloaded while the window has been out of sight for ten minutes and no call is running, at most once an hour. Past twice this (8 GB at least) a screen share is ended and Teams is reloaded or restarted, right away or as soon as a call is over. 0 turns both off."
       },
       {
         "key": "url",

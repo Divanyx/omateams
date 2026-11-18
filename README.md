@@ -173,20 +173,31 @@ under `/usr/share/omarchy/themes`.
 
   Past a hard limit, twice the reload limit and at least 8 GB counted over
   the page and the window process together, nothing waits for the window to
-  go out of sight. A running screen share is ended (the call goes on), a call
-  is left alone and the page is reloaded right after it, and otherwise the
-  page is reloaded at once; each comes with a notification. While the screen
-  is shared, the size is read every ten seconds instead of every five
-  minutes, since that is where Teams has been seen to grow by over 40 GB in
-  half an hour.
+  go out of sight. A running screen share is ended (the call goes on). A
+  call is left alone and Teams starts over right after it, unless memory
+  runs short first: with under a tenth of it or under 2 GB left, on the
+  machine or under a cgroup limit such as systemd's `MemoryMax`, Teams
+  starts over at once and the call has to be joined again. Without a call it
+  starts over at once. Starting over is a reload when the page is what
+  grew. When the window process holds more than half the limit, no reload
+  gives that back, and the process is restarted instead: the window returns
+  shown or hidden as it was, still signed in. Each step comes with a
+  notification. The size is read every ten seconds instead of every five
+  minutes while the screen is shared and from then on, while a call is
+  waited out, and whenever Teams is past half the hard limit; a screen share
+  is where it has been seen to grow by gigabytes a minute, in the page as
+  well as in the window process.
 - **Screen sharing** goes through PipeWire and the desktop portal
   (`xdg-desktop-portal-hyprland`), which Omarchy ships. When a share ends,
   Chromium's PipeWire capturer terminates the EGL display it shares with the
   GPU thread, which QtWebEngine runs inside the window process. Every frame
-  after that fails to get an EGL sync, and discarding the page or quitting
-  ends in SIGTRAP. So once this process has shared the screen, a reload
-  restarts the whole window process (shown or hidden as before, still signed
-  in) and quitting skips Chromium's teardown.
+  after that fails to get an EGL sync, discarding the page or quitting ends
+  in SIGTRAP, and on some systems the window process then grows without
+  bound (180 GB in 45 minutes in one report). So once Teams has been let at
+  the screen, whether or not a share came of it, a reload restarts the whole
+  window process (shown or hidden as before, still signed in), quitting
+  skips Chromium's teardown, and the hard limit above is checked every ten
+  seconds.
 - **What theming can't reach.** Colors baked into images, avatars and a few
   hard-coded brand accents in Teams' own SVGs stay as they are.
 - Omateams is not affiliated with Microsoft. Microsoft Teams is a trademark of

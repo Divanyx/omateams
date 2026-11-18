@@ -77,18 +77,27 @@ Window {
   readonly property int hardLimit: memoryLimit <= 0 ? 0 : Math.max(8192, 2 * effectiveLimit)
   readonly property int rescueSpacingMs: 2 * 60 * 1000
   property int hostMemory: -1
+  readonly property int used: Math.max(0, pageMemory) + Math.max(0, hostMemory)
   property bool sharing: false
   property real lastRescue: 0
-  // Over the hard limit in a call: reloaded once the call is over.
+  // Over the hard limit in a call: dealt with once the call is over.
   property bool overdue: false
-  property bool hostWarned: false
-  // Set once this process has shared the screen. When a share ends,
-  // Chromium's PipeWire capturer terminates the EGL display it shares with
-  // the GPU thread, which in QtWebEngine runs in this very process (in Chrome
-  // it is a process of its own). Every frame after that fails to get a sync
-  // object, and discarding the page or shutting down dies with SIGTRAP. So
-  // from then on a reload is a restart, and quitting skips the teardown.
+  // The page has been asked what it is doing and has yet to answer.
+  property bool asking: false
+  // Set once the page has been let at the screen, whether or not a share
+  // came of it. When a share ends, Chromium's PipeWire capturer terminates
+  // the EGL display it shares with the GPU thread, which in QtWebEngine runs
+  // in this very process (in Chrome it is a process of its own). Every frame
+  // after that fails to get a sync object, discarding the page or shutting
+  // down dies with SIGTRAP, and this process has been seen to pile up
+  // 180 GiB in 45 minutes. So from then on a reload is a restart, quitting
+  // skips the teardown, and memory is read every few seconds.
   property bool captured: false
+  // When to read memory every few seconds instead of every five minutes:
+  // while the screen is shared and for good once it has been, while a call
+  // is waited out, and when Teams is halfway to the hard limit whatever
+  // took it there.
+  readonly property bool watchful: hardLimit > 0 && (sharing || captured || overdue || used > hardLimit / 2)
 
   readonly property string focusCommand:
     "hyprctl dispatch 'hl.dsp.focus({ window = \"class:omateams\" })' >/dev/null 2>&1"
@@ -305,8 +314,13 @@ Window {
     hostMemory = Sys.processMemory(Sys.pid())
     if (pageBaseline < 0 && pageMemory > 0 && Date.now() - pageLoadedAt >= baselineDelayMs)
       pageBaseline = pageMemory
-    statusTimer.restart()
-    if (hardLimit > 0 && pageMemory + hostMemory > hardLimit) { rescue(); return }
+    // Read every few seconds, the sizes reach the status file with the
+    // heartbeat; the bar widget need not look at it that often.
+    if (!watchful) statusTimer.restart()
+    if (hardLimit > 0 && used > hardLimit) { rescue(); return }
+    // Not at the limit itself: a size that hovers around it must not bring
+    // the notice up again and again.
+    if (used <= hardLimit / 2) overdue = false
     if (effectiveLimit <= 0 || pageBaseline < 0 || pageMemory <= effectiveLimit) return
     if (!concealed || win.active || Date.now() - concealedSince < recycleIdleMs) return
     // A limit set below what a fresh Teams needs must not turn into a loop.
@@ -318,34 +332,66 @@ Window {
   }
 
   // Memory past the hard limit is dealt with at once, whether or not the
-  // window is in sight. A screen share is ended, since that is where Teams
-  // has been seen to run away, and the call goes on without it; a call is
-  // never dropped, the page is reloaded once it is over; anything else is
-  // reloaded right away.
+  // window is in sight. A screen share is ended first, since that is where
+  // Teams has been seen to run away, and the call goes on without it. A call
+  // is left alone and the cure follows as soon as it is over, unless memory
+  // runs short before that: a call is not worth everything else that runs
+  // on the machine. The cure is a reload when the page is what grew. When it
+  // is this process, a reload frees nothing and only starting it over does;
+  // after a screen share that is the only way a reload works at all.
+  //
+  // The page is asked what it is doing. One that does not answer is taken to
+  // be idle: a renderer that hangs must not keep the memory from being freed.
   function rescue() {
-    if (Date.now() - lastRescue < rescueSpacingMs) return
-    lastRescue = Date.now()
-    view.runJavaScript("window.__omateamsSharing ? [window.__omateamsSharing(), window.__omateamsInCall()] : [false, false]", function(state) {
-      var used = gib(pageMemory + hostMemory)
-      if (state && state[0]) {
-        view.runJavaScript("window.__omateamsStopSharing()")
-        sharing = false
-        memoryNotice("Screen sharing stopped",
-          "Teams had grown to " + used + " GiB while sharing your screen. The call goes on; share again to carry on.")
-      } else if (state && state[1]) {
-        if (!overdue) memoryNotice("Teams is using " + used + " GiB",
-          "It will be reloaded as soon as the call is over.")
-        overdue = true
-      } else if (pageMemory > effectiveLimit) {
-        memoryNotice("Teams reloaded", "It had grown to " + used + " GiB.")
-        recycle()
-      } else if (!hostWarned) {
-        // The page is not what grew, so a reload would not free anything.
-        hostWarned = true
-        memoryNotice("Teams is using " + used + " GiB",
-          "Most of it is held by the window process. Restart it with: omateams quit && omateams")
-      }
-    })
+    if (asking) return
+    asking = true
+    answerTimeout.restart()
+    view.runJavaScript("window.__omateamsSharing ? [window.__omateamsSharing(), window.__omateamsInCall()] : [false, false]",
+      function(state) { win.cure(state) })
+  }
+
+  function cure(state) {
+    if (!asking) return
+    asking = false
+    answerTimeout.stop()
+    if (recycling || quitting) return
+    var size = gib(used)
+    var shares = !!state && state[0] === true
+    var inCall = shares || (!!state && state[1] === true) || view.recentlyAudible
+    var restarts = captured || hostMemory > hardLimit / 2
+    if (shares) {
+      view.runJavaScript("window.__omateamsStopSharing()")
+      sharing = false
+      memoryNotice("Screen sharing stopped",
+        "Teams had grown to " + size + " GiB while sharing your screen. The call goes on.")
+      return
+    }
+    var tight = inCall && memoryShort()
+    if (inCall && !tight) {
+      if (!overdue) memoryNotice("Teams is using " + size + " GiB",
+        "It will be " + (restarts ? "restarted" : "reloaded") + " as soon as the call is over.")
+      overdue = true
+      return
+    }
+    var reason = "It had grown to " + size + " GiB"
+      + (tight ? " and memory was running out. Join your call again." : ".")
+    if (restarts) {
+      memoryNotice("Teams restarted", reason)
+      restart()
+    } else if (Date.now() - lastRescue >= rescueSpacingMs) {
+      // A reload that the page refuses to make in a fresh process frees
+      // nothing; it is not tried again right away.
+      lastRescue = Date.now()
+      memoryNotice("Teams reloaded", reason)
+      recycle()
+    }
+  }
+
+  // Under a tenth of the memory is left, or under 2 GiB: of the machine's,
+  // or of what a limit on its cgroup lets this process have.
+  function memoryShort() {
+    var room = Sys.memoryRoom()
+    return room.total > 0 && room.available < Math.max(2048, room.total / 10)
   }
 
   function gib(mib) { return (mib / 1024).toFixed(1) }
@@ -399,7 +445,6 @@ Window {
     recycling = false
     clientReady = false
     overdue = false
-    hostWarned = false
     sharing = false
     view.lifecycleState = WebEngineView.LifecycleState.Active
     view.visible = true
@@ -656,9 +701,11 @@ Window {
     onRunningChanged: if (running) ticks = 0
     onTriggered: if (++ticks >= 30 || Sys.processMemory(win.recyclePid) < 0) win.revive()
   }
-  // Every few seconds while the screen is shared, where Teams can grow by
-  // gigabytes a minute; every five minutes otherwise.
-  Timer { id: memoryTimer; interval: win.sharing ? 10 * 1000 : 5 * 60 * 1000; repeat: true; running: true; onTriggered: win.checkMemory() }
+  // Every few seconds where Teams can grow by gigabytes a minute (see
+  // watchful); every five minutes otherwise.
+  Timer { id: memoryTimer; interval: win.watchful ? 10 * 1000 : 5 * 60 * 1000; repeat: true; running: true; onTriggered: win.checkMemory() }
+  // How long the page gets to say whether it is in a call; see rescue().
+  Timer { id: answerTimeout; interval: 10 * 1000; onTriggered: win.cure(null) }
   // Reads the size of the fresh page once it has settled after a reload.
   Timer { id: memoryRecheck; interval: 90 * 1000; onTriggered: win.checkMemory() }
 
@@ -727,8 +774,13 @@ Window {
     }
 
     onPermissionRequested: function(permission) {
-      if (win.isTeamsOrigin(permission.origin)) permission.grant()
-      else permission.deny()
+      if (!win.isTeamsOrigin(permission.origin)) { permission.deny(); return }
+      // The capturer comes and goes with the request, share or no share.
+      var type = permission.permissionType
+      if (type === WebEnginePermission.PermissionType.DesktopVideoCapture
+          || type === WebEnginePermission.PermissionType.DesktopAudioVideoCapture)
+        win.captured = true
+      permission.grant()
     }
 
     onWebAuthUxRequested: function(request) { win.showWebAuthUx(request, win) }
