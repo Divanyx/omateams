@@ -114,9 +114,18 @@ void Bridge::watch(const QString &path)
         m_watcher.addPath(path);
 }
 
+// A helper gets none of this process's open files and sockets. Chromium
+// leaves most of its own inheritable, and the helper that starts the next
+// instance (see restart() in Main.qml) would hand it the old one's shared
+// memory, GPU buffers and listening sockets, which the kernel then keeps
+// for as long as the new instance runs.
 void Bridge::run(const QString &program, const QStringList &arguments)
 {
-    QProcess::startDetached(program, arguments);
+    QProcess process;
+    process.setProgram(program);
+    process.setArguments(arguments);
+    process.setUnixProcessParameters(QProcess::UnixProcessFlag::CloseFileDescriptors);
+    process.startDetached();
 }
 
 int Bridge::runCapture(const QString &program, const QStringList &arguments)
@@ -126,6 +135,7 @@ int Bridge::runCapture(const QString &program, const QStringList &arguments)
     process->setProgram(program);
     process->setArguments(arguments);
     process->setProcessChannelMode(QProcess::SeparateChannels);
+    process->setUnixProcessParameters(QProcess::UnixProcessFlag::CloseFileDescriptors);
     connect(process, &QProcess::finished, this, [this, process, id](int exitCode, QProcess::ExitStatus) {
         emit processFinished(id, exitCode, QString::fromUtf8(process->readAllStandardOutput()));
         process->deleteLater();
